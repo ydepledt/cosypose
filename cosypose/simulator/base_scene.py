@@ -27,14 +27,14 @@ class BaseScene:
             os.environ['MESA_GL_VERSION_OVERRIDE'] = '3.3'
             os.environ['MESA_GLSL_VERSION_OVERRIDE'] = '330'
             # Get EGL device
-            assert 'CUDA_VISIBLE_DEVICES' in os.environ
-            devices = os.environ.get('CUDA_VISIBLE_DEVICES', ).split(',')
+            #assert 'CUDA_VISIBLE_DEVICES' in os.environ
+            devices = [0] #os.environ.get('CUDA_VISIBLE_DEVICES', ).split(',')
             assert len(devices) == 1
             out = subprocess.check_output(['nvidia-smi', '--id='+str(devices[0]), '-q', '--xml-format'])
             tree = ET.fromstring(out)
             gpu = tree.findall('gpu')[0]
             dev_id = gpu.find('minor_number').text
-            os.environ['EGL_VISIBLE_DEVICES'] = str(dev_id)
+            #os.environ['EGL_VISIBLE_DEVICES'] = str(dev_id)
             egl = pkgutil.get_loader('eglRenderer')
             pb.loadPlugin(egl.get_filename(), "_eglRendererPlugin", physicsClientId=self._client_id)
         pb.resetSimulation(physicsClientId=self._client_id)

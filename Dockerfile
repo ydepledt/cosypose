@@ -11,9 +11,11 @@ RUN bash /Miniconda3-latest-Linux-x86_64.sh -b -p /opt/conda \
 
 
 WORKDIR /host_pwd
-ENV CUDA_VISIBLE_DEVICES=0
 ADD . .
 RUN /opt/conda/bin/conda env create -n cosypose --file environment.yaml 
 RUN /opt/conda/bin/conda run -n cosypose python --version setup.py install
 
 RUN apt-get update -qqy && DEBIAN_FRONTEND=noninteractive apt-get install -qqy meshlab && rm -rf /var/{cache,lib}/apt
+
+#ENV CUDA_VISIBLE_DEVICES=0
+ENV NVIDIA_VISIBLE_DEVICES=3
