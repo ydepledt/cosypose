@@ -40,8 +40,15 @@ def make_scene_dataset(ds_name, n_frames=None):
     elif ds_name == 'tless.primesense.test.bop19':
         ds = _make_tless_dataset('test_primesense')
         ds = keep_bop19(ds)
+    elif ds_name == 'tless_stairs.train.pbr':
+        ds_dir = BOP_DS_DIR / 'tless_stairs'
+        ds = BOPDataset(ds_dir, split='train_pbr')
 
     # YCBV
+    elif ds_name == 'ycbv_stairs.train.pbr_norand':
+        ds_dir = BOP_DS_DIR / 'ycbv_stairs'
+        ds = BOPDataset(ds_dir, split='train_pbr_norand')
+
     elif ds_name == 'ycbv.train.real':
         ds_dir = BOP_DS_DIR / 'ycbv'
         ds = BOPDataset(ds_dir, split='train_real')
@@ -154,6 +161,12 @@ def make_object_dataset(ds_name):
     elif ds_name == 'tless.eval' or ds_name == 'tless.bop':
         ds = BOPObjectDataset(BOP_DS_DIR / 'tless/models_eval')
 
+    # Custom TLESS
+    elif ds_name == 'tless_test':
+        ds = BOPObjectDataset(BOP_DS_DIR / 'tless_test/models_cad')
+    elif ds_name == 'tless_stairs':
+        ds = BOPObjectDataset(BOP_DS_DIR / 'tless_stairs/models_reconst')
+
     # YCBV
     elif ds_name == 'ycbv.bop':
         ds = BOPObjectDataset(BOP_DS_DIR / 'ycbv/models')
@@ -164,6 +177,8 @@ def make_object_dataset(ds_name):
     elif ds_name == 'ycbv.bop-compat.eval':
         # PoseCNN eval meshes and symmetries, WITH bop offsets
         ds = BOPObjectDataset(BOP_DS_DIR / 'ycbv/models_bop-compat_eval')
+    elif ds_name == 'ycbv_stairs':
+        ds = BOPObjectDataset(BOP_DS_DIR / 'ycbv_stairs/models_fine')
 
     # Other BOP
     elif ds_name == 'hb':
@@ -194,6 +209,12 @@ def make_urdf_dataset(ds_name):
     # BOP
     if ds_name == 'tless.cad':
         ds = BOPUrdfDataset(LOCAL_DATA_DIR / 'urdfs' / 'tless.cad')
+    elif ds_name == 'tless_test':
+        ds = BOPUrdfDataset(LOCAL_DATA_DIR / 'urdfs' / 'tless_test')
+    elif ds_name == 'tless_stairs':
+        ds = BOPUrdfDataset(LOCAL_DATA_DIR / 'urdfs' / 'tless_stairs')
+    elif ds_name == 'ycbv_stairs':
+        ds = BOPUrdfDataset(LOCAL_DATA_DIR / 'urdfs' / 'ycbv_stairs')
     elif ds_name == 'tless.reconst':
         ds = BOPUrdfDataset(LOCAL_DATA_DIR / 'urdfs' / 'tless.reconst')
     elif ds_name == 'ycbv':
@@ -208,6 +229,8 @@ def make_urdf_dataset(ds_name):
         ds = BOPUrdfDataset(LOCAL_DATA_DIR / 'urdfs' / 'lm')
     elif ds_name == 'tudl':
         ds = BOPUrdfDataset(LOCAL_DATA_DIR / 'urdfs' / 'tudl')
+    elif ds_name == 'cesar':
+        ds = BOPUrdfDataset(LOCAL_DATA_DIR / 'urdfs' / 'cesar')
 
     # Custom scenario
     elif 'custom' in ds_name:

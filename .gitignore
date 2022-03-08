@@ -20,3 +20,10 @@ dist/
 *.so
 build/
 *.tempMiniconda3-latest-Linux-x86_64.sh
+images
+test.npz
+results*
+Miniconda3-latest-Linux-x86_64.sh
+scratch
+input*
+core

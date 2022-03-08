@@ -13,6 +13,7 @@ if __name__ == '__main__':
     parser.add_argument('--config', default='', type=str)
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--resume', default='', type=str)
+    parser.add_argument('--idpretrain', default='', type=str)
     parser.add_argument('--no-eval', action='store_true')
     args = parser.parse_args()
 
@@ -51,8 +52,12 @@ if __name__ == '__main__':
     cfg.anchor_sizes = ((32,), (64,), (128,), (256,), (512,))
 
     # Pretraning
-    cfg.run_id_pretrain = None
-    cfg.pretrain_coco = True
+    if 'detector' in args.idpretrain:
+        cfg.run_id_pretrain = args.idpretrain
+        cfg.pretrain_coco = False
+    else:
+        cfg.run_id_pretrain = None
+        cfg.pretrain_coco = True
 
     # Training
     cfg.batch_size = 2
@@ -78,7 +83,7 @@ if __name__ == '__main__':
     if 'tless' in args.config:
         cfg.input_resize = (540, 720)
     elif 'ycbv' in args.config:
-        cfg.input_resize = (480, 640)
+        cfg.input_resize = (540, 720)
     elif 'bop-' in args.config:
         cfg.input_resize = None
     else:
@@ -101,6 +106,10 @@ if __name__ == '__main__':
         if len(bop_cfg['test_ds_name']) > 0:
             cfg.test_ds_names = bop_cfg['test_ds_name']
 
+    elif '_stairs' in args.config:
+        cfg.input_resize = (480,640)
+        cfg.train_ds_names = [('ycbv_stairs.train.pbr_norand', 1)]
+        cfg.val_ds_name = cfg.train_ds_names
     else:
         raise ValueError(args.config)
     cfg.val_ds_names = cfg.train_ds_names

@@ -9,6 +9,7 @@ from .bullet_scene_renderer import BulletSceneRenderer
 def init_renderer(urdf_ds, preload=True):
     renderer = BulletSceneRenderer(urdf_ds=urdf_ds,
                                    preload_cache=preload,
+                                   gpu_renderer=True,
                                    background_color=(0, 0, 0))
     return renderer
 
@@ -56,6 +57,7 @@ class BulletBatchRenderer:
             obj_info = dict(
                 name=obj_infos[n]['name'],
                 TWO=np.eye(4)
+                # TWO=TOC[n]
             )
             cam_info = dict(
                 resolution=resolution,

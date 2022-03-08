@@ -21,9 +21,9 @@ def run_meshlab_script(in_path, out_path, script, cd_dir=None, has_textures=True
 
     if cd_dir is None:
         cd_dir = '.'
-    command = [f'cd {cd_dir} &&', 'LC_ALL=C',
-               'meshlabserver', '-i', in_path.as_posix(), '-o', out_path.as_posix(),
-               '-s', script_path.as_posix(), '-om', 'vn']
+    # !!!! 
+    # I needed to remove filtering
+    command = [f'cd {cd_dir} &&', 'LC_ALL=C', 'xvfb-run -a -s "-screen 0 800x600x24" meshlabserver ', '-i', in_path.as_posix(), '-o', out_path.as_posix(), '-om', 'vn']
     if has_textures:
         command += ['wt', 'vt']
     print(command)
@@ -61,7 +61,7 @@ def ply_to_obj(ply_path, obj_path, texture_size=(1024, 1024)):
         template = _get_template('template_vertexcolor_to_texture.mlx')
         out_texture_path = obj_path.with_suffix('').name + '_texture.png'
         script = template.format(out_texture_path=out_texture_path)
-        run_meshlab_script(ply_copied_path, obj_path, script, cd_dir=obj_path.parent)
+        run_meshlab_script(ply_copied_path, obj_path, script, cd_dir=obj_path.parent, has_textures = False)
     else:
         template = _get_template('template_ply_texture_to_obj.mlx')
         script = template

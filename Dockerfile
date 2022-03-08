@@ -18,4 +18,4 @@ RUN /opt/conda/bin/conda run -n cosypose python --version setup.py install
 RUN apt-get update -qqy && DEBIAN_FRONTEND=noninteractive apt-get install -qqy meshlab && rm -rf /var/{cache,lib}/apt
 
 #ENV CUDA_VISIBLE_DEVICES=0
-ENV NVIDIA_VISIBLE_DEVICES=3
+ENV NVIDIA_VISIBLE_DEVICES=0,1,2,3

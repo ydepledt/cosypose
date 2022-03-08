@@ -48,24 +48,24 @@ def make_cfg(args):
     cfg.n_pose_dims = 9
     cfg.n_rendering_workers = N_WORKERS
     cfg.refiner_run_id_for_test = None
-    cfg.coarse_run_id_for_test = None
+    cfg.coarse_run_id_for_test = 'ycbv_stairs-coarse--905711'
 
     # Optimizer
-    cfg.lr = 3e-4
+    cfg.lr = 1e-5
     cfg.weight_decay = 0.
     cfg.n_epochs_warmup = 50
     cfg.lr_epoch_decay = 500
     cfg.clip_grad_norm = 0.5
 
     # Training
-    cfg.batch_size = 32
-    cfg.epoch_size = 115200
-    cfg.n_epochs = 700
+    cfg.batch_size = 64
+    cfg.epoch_size = 12800
+    cfg.n_epochs = 2000
     cfg.n_dataloader_workers = N_WORKERS
 
     # Method
     cfg.loss_disentangled = True
-    cfg.n_points_loss = 2600
+    cfg.n_points_loss = 8
     cfg.TCO_input_generator = 'fixed'
     cfg.n_iterations = 1
     cfg.min_area = None
@@ -95,9 +95,7 @@ def make_cfg(args):
         cfg.test_ds_names = []
 
         if model_type == 'coarse':
-            cfg.init_method = 'z-up+auto-depth'
-            cfg.TCO_input_generator = 'fixed+trans_noise'
-            run_comment = 'transnoise-zxyavg'
+            cfg.TCO_input_generator = 'fixed'
         elif model_type == 'refiner':
             cfg.TCO_input_generator = 'gt+noise'
         else:
@@ -119,6 +117,25 @@ def make_cfg(args):
         elif args.config == 'ycbv-refiner-finetune':
             cfg.TCO_input_generator = 'gt+noise'
             cfg.run_id_pretrain = 'ycbv-refiner-syntonly--596719'
+        else:
+            raise ValueError(args.config)
+
+    elif 'ycbv_stairs-' in args.config:
+        cfg.urdf_ds_name = 'ycbv_stairs'
+        cfg.object_ds_name = 'ycbv_stairs'
+        cfg.train_ds_names = [('ycbv_stairs.train.pbr_norand',1)]
+        cfg.val_ds_names = cfg.train_ds_names
+        cfg.input_resize = (480,640)
+        cfg.test_ds_names = []
+
+        if 'coarse' in args.config:
+            cfg.TCO_input_generator = 'fixed'
+            cfg.run_id_pretrain = 'ycbv_stairs-coarse-4GPU-fixed-519538'
+            run_comment = '4GPU-fixed'
+        elif 'refiner' in args.config:
+            cfg.TCO_input_generator = 'gt+noise_stairs'
+            cfg.run_id_pretrain = 'ycbv_stairs-refiner-4GPU-86821'
+            run_comment = '4GPU'
         else:
             raise ValueError(args.config)
 

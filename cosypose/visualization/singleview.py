@@ -61,3 +61,20 @@ def make_singleview_prediction_plots(scene_ds, renderer, predictions, detections
     figures['pred_rendered'] = plotter.plot_image(pred_rendered)
     figures['pred_overlay'] = plotter.plot_overlay(rgb_input, pred_rendered)
     return figures
+
+def make_singleview_custom_plot(rgb_input, camera, renderer, predictions, detections=None, resolution=(640, 480)):
+    plotter = Plotter()
+
+    figures = dict()
+
+    figures['input_im'] = plotter.plot_image(rgb_input)
+
+    if detections is not None:
+        fig_dets = plotter.plot_image(rgb_input)
+        fig_dets = plotter.plot_maskrcnn_bboxes(fig_dets, detections)
+        figures['detections'] = fig_dets
+    
+    pred_rendered = render_prediction_wrt_camera(renderer, predictions, camera=camera)
+    figures['pred_rendered'] = plotter.plot_image(pred_rendered)
+    figures['pred_overlay'] = plotter.plot_overlay(rgb_input, pred_rendered)
+    return figures

@@ -3,16 +3,16 @@ default_queue: 'gpu_p1'
 
 projects:
   cosypose:
-    dir: '$WORK/projects/cosypose/cosypose' # Replace $WORK/projects by location of cosypose directory
+    dir: '/host_pwd/cosypose/cosypose' # Replace $WORK/projects by location of cosypose directory
     preamble: 'job-runner-preamble.sh'
     conda_env: 'cosypose'
     default_queue: 'gpu_p1'
 
 conda:
-  root: '$WORK/anaconda' # Path to anaconda installation
+  root: '/opt/conda' # Path to anaconda installation
 
 storage:
-  root: '$SCRATCH/jobs' # Where to store information of the jobs
+  root: 'scratch/jobs' # Where to store information of the jobs
 
 gpu_queues:
   gpu_p1:  # Provide SLURM information relative to the queue you want to use

@@ -19,13 +19,13 @@ def make_cfg(cfg_name,
     cfg.overwrite = overwrite
     cfg.ds_name = 'default_dataset'
 
-    n_frames = 1e6
-    cfg.n_frames_per_chunk = 100
+    n_frames = 100
+    cfg.n_frames_per_chunk = 10
     cfg.n_chunks = n_frames // cfg.n_frames_per_chunk
     cfg.train_ratio = 0.95
 
     cfg.distributed = distributed
-    cfg.n_workers = 6
+    cfg.n_workers = 10
     cfg.n_processes_per_gpu = 10
 
     cfg.scene_cls = 'cosypose.recording.bop_recording_scene.BopRecordingScene'
@@ -33,14 +33,14 @@ def make_cfg(cfg_name,
         gpu_renderer=True,
         texture_ds='shapenet',
         domain_randomization=True,
-        n_objects_interval=(3, 9),
+        n_objects_interval=(1, 1),
         proba_falling=0.5,
-        border_check=False,
+        border_check=True,
         n_textures_cache=100,
         objects_xyz_interval=((-0.25, -0.25, 0.), (0.25, 0.25, 0.25)),
         focal_interval=((1060, 1060), (1080, 1080)),
     )
-    cfg.ds_name = f'{cfg_name}-1M'
+    cfg.ds_name = f'{cfg_name}-10.train'
 
     if cfg_name == 'ycbv':
         cfg.scene_kwargs.update(
@@ -56,6 +56,14 @@ def make_cfg(cfg_name,
             resolution=(720, 540),
             textures_on_objects=True,
             camera_distance_interval=(0.65, 0.94),
+        )
+
+    elif cfg_name == 'tless_test':
+        cfg.scene_kwargs.update(
+            urdf_ds='tless_test',
+            resolution=(720,540),
+            textures_on_objects=True,
+            camera_distance_interval=(0.65,0.94),
         )
 
     elif resume_ds_name:
@@ -94,8 +102,8 @@ def main():
     cfg = make_cfg(args.config,
                    resume_ds_name=args.resume,
                    debug=args.debug,
-                   distributed=not args.local,
-                   overwrite=args.overwrite)
+                   distributed=False,
+                   overwrite=True)
     for k, v in vars(cfg).items():
         print(k, v)
 

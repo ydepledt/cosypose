@@ -18,6 +18,7 @@ class CoarseRefinePosePredictor(torch.nn.Module):
                  bsz_objects=64):
         super().__init__()
         self.coarse_model = coarse_model
+        assert self.coarse_model is not None
         self.refiner_model = refiner_model
         self.bsz_objects = bsz_objects
         self.eval()
@@ -31,6 +32,10 @@ class CoarseRefinePosePredictor(torch.nn.Module):
 
         ds = TensorDataset(ids)
         dl = DataLoader(ds, batch_size=self.bsz_objects)
+
+        # for time analysis
+        dt_render = []
+        dt_net = []
 
         preds = defaultdict(list)
         for (batch_ids, ) in dl:
@@ -46,7 +51,6 @@ class CoarseRefinePosePredictor(torch.nn.Module):
             timer.pause()
             for n in range(1, n_iterations+1):
                 iter_outputs = outputs[f'iteration={n}']
-
                 infos = obj_inputs.infos
                 batch_preds = tc.PandasTensorCollection(infos,
                                                         poses=iter_outputs['TCO_output'],
@@ -55,11 +59,15 @@ class CoarseRefinePosePredictor(torch.nn.Module):
                                                         boxes_rend=iter_outputs['boxes_rend'],
                                                         boxes_crop=iter_outputs['boxes_crop'])
                 preds[f'iteration={n}'].append(batch_preds)
+                dt_render.append(iter_outputs['delta_t_render'])
+                dt_net.append(iter_outputs['delta_t_net'])
 
         logger.debug(f'Pose prediction on {len(obj_data)} detections (n_iterations={n_iterations}): {timer.stop()}')
         preds = dict(preds)
         for k, v in preds.items():
             preds[k] = tc.concatenate(v)
+        preds['delta_t_render'] = dt_render
+        preds['delta_t_net'] = dt_net
         return preds
 
     def make_TCO_init(self, detections, K):
@@ -80,6 +88,8 @@ class CoarseRefinePosePredictor(torch.nn.Module):
                         n_refiner_iterations=1):
 
         preds = dict()
+        delta_t_net = []
+        delta_t_render = []
         if data_TCO_init is None:
             assert detections is not None
             assert self.coarse_model is not None
@@ -90,6 +100,8 @@ class CoarseRefinePosePredictor(torch.nn.Module):
                                                           n_iterations=n_coarse_iterations)
             for n in range(1, n_coarse_iterations + 1):
                 preds[f'coarse/iteration={n}'] = coarse_preds[f'iteration={n}']
+            delta_t_net += coarse_preds['delta_t_net']
+            delta_t_render += coarse_preds['delta_t_render']
             data_TCO = coarse_preds[f'iteration={n_coarse_iterations}']
         else:
             assert n_coarse_iterations == 0
@@ -103,5 +115,9 @@ class CoarseRefinePosePredictor(torch.nn.Module):
                                                            n_iterations=n_refiner_iterations)
             for n in range(1, n_refiner_iterations + 1):
                 preds[f'refiner/iteration={n}'] = refiner_preds[f'iteration={n}']
+            delta_t_net += refiner_preds['delta_t_net']
+            delta_t_render += refiner_preds['delta_t_render']
             data_TCO = refiner_preds[f'iteration={n_refiner_iterations}']
+        preds['delta_t_net'] = delta_t_net
+        preds['delta_t_render'] = delta_t_render
         return data_TCO, preds

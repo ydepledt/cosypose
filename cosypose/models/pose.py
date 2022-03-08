@@ -11,6 +11,7 @@ from cosypose.lib3d.rotations import (
     compute_rotation_matrix_from_ortho6d, compute_rotation_matrix_from_quaternions)
 from cosypose.lib3d.cosypose_ops import apply_imagespace_predictions
 
+from cosypose.utils.timer import Timer
 from cosypose.utils.logging import get_logger
 logger = get_logger(__name__)
 
@@ -91,19 +92,24 @@ class PosePredictor(nn.Module):
         assert K.shape == (bsz, 3, 3)
         assert TCO.shape == (bsz, 4, 4)
         assert len(labels) == bsz
-
+        
+        timer = Timer()
         outputs = dict()
         TCO_input = TCO
         for n in range(n_iterations):
             TCO_input = TCO_input.detach()
             images_crop, K_crop, boxes_rend, boxes_crop = self.crop_inputs(images, K, TCO_input, labels)
+            timer.start()
             renders = self.renderer.render(obj_infos=[dict(name=l) for l in labels],
                                            TCO=TCO_input,
                                            K=K_crop, resolution=self.render_size)
+            delta_t_render = timer.stop()
 
             x = torch.cat((images_crop, renders), dim=1)
-
+            
+            timer.start()
             model_outputs = self.net_forward(x)
+            delta_t_net = timer.stop()
 
             TCO_output = self.update_pose(TCO_input, K_crop, model_outputs['pose'])
 
@@ -114,6 +120,8 @@ class PosePredictor(nn.Module):
                 'model_outputs': model_outputs,
                 'boxes_rend': boxes_rend,
                 'boxes_crop': boxes_crop,
+                'delta_t_render': delta_t_render.total_seconds(),
+                'delta_t_net': delta_t_net.total_seconds(),
             }
 
             TCO_input = TCO_output

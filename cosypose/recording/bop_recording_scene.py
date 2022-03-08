@@ -21,7 +21,7 @@ class BopRecordingScene(BaseScene):
                  texture_ds='shapenet',
                  domain_randomization=True,
                  textures_on_objects=False,
-                 n_objects_interval=(2, 5),
+                 n_objects_interval=(1, 1),
                  objects_xyz_interval=((0.0, -0.5, -0.15), (1.0, 0.5, 0.15)),
                  proba_falling=0.5,
                  resolution=(640, 480),

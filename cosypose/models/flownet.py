@@ -123,6 +123,6 @@ def flownet_pretrained(n_inputs):
     model = FlowNetS(n_inputs=n_inputs).cuda()
     # Download pretrained checkpoint here https://github.com/ClementPinard/FlowNetPytorch/blob/master/models/FlowNetS.py
     state_dict = torch.load(LOCAL_DATA_DIR / 'flownets_EPE1.951.pth.tar')
-    state_dict = {k: v for k, v in state_dict.items() if ('conv' in k and 'deconv' not in k)}
+    state_dict = {k : v for k, v in state_dict['state_dict'].items() if ('conv' in k and 'deconv' not in k)}
     model.load_state_dict(state_dict)
     return model

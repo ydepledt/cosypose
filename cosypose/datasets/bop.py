@@ -26,10 +26,9 @@ def remap_bop_targets(targets):
     return targets
 
 
-@MEMORY.cache
+# @MEMORY.cache
 def build_index(ds_dir, save_file, split, save_file_annotations):
     scene_ids, cam_ids, view_ids = [], [], []
-
     annotations = dict()
     base_dir = ds_dir / split
 

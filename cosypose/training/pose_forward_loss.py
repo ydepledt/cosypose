@@ -24,7 +24,7 @@ def h_pose(model, mesh_db, data, meters,
     TCO_gt = cast(data.TCO).float()
     labels = np.array([obj['name'] for obj in data.objects])
     bboxes = cast(data.bboxes).float()
-
+    
     meshes = mesh_db.select(labels)
     points = meshes.sample_points(cfg.n_points_loss, deterministic=False)
     TCO_possible_gt = TCO_gt.unsqueeze(1) @ meshes.symmetries
@@ -33,6 +33,8 @@ def h_pose(model, mesh_db, data, meters,
         TCO_init = TCO_init_from_boxes(z_range=(1.0, 1.0), boxes=bboxes, K=K)
     elif input_generator == 'gt+noise':
         TCO_init = add_noise(TCO_possible_gt[:, 0], euler_deg_std=[15, 15, 15], trans_std=[0.01, 0.01, 0.05])
+    elif input_generator == 'gt+noise_stairs':
+        TCO_init = add_noise(TCO_possible_gt[:, 0], euler_deg_std=[15, 15, 15], trans_std=[0.05, 0.05, 0.2])
     elif input_generator == 'fixed+trans_noise':
         assert cfg.init_method == 'z-up+auto-depth'
         TCO_init = TCO_init_from_boxes_zup_autodepth(bboxes, points, K)
@@ -42,7 +44,7 @@ def h_pose(model, mesh_db, data, meters,
     else:
         raise ValueError('Unknown input generator', input_generator)
 
-    # model.module.enable_debug()
+    #model.module.enable_debug()
     outputs = model(images=images, K=K, labels=labels,
                     TCO=TCO_init, n_iterations=n_iterations)
     # raise ValueError

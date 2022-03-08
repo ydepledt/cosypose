@@ -20,7 +20,7 @@ class MultiviewPredictionRunner:
         self.rank = get_rank()
         self.world_size = get_world_size()
         self.tmp_dir = get_tmp_dir()
-
+        
         assert batch_size == 1, 'Multiple view groups not supported for now.'
         sampler = DistributedSceneSampler(scene_ds, num_replicas=self.world_size, rank=self.rank)
         self.sampler = sampler

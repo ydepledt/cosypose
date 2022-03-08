@@ -249,7 +249,8 @@ def train_pose(args):
     ds_iter_val = MultiEpochDataLoader(ds_iter_val)
 
     # Make model
-    renderer = BulletBatchRenderer(object_set=args.urdf_ds_name, n_workers=args.n_rendering_workers)
+    # !!!! n_workers = 0 and pre loaded = False are because of deeprap config !!!!!
+    renderer = BulletBatchRenderer(object_set=args.urdf_ds_name, n_workers=args.n_rendering_workers, preload_cache=False)
     object_ds = make_object_dataset(args.object_ds_name)
     mesh_db = MeshDataBase.from_object_ds(object_ds).batched(n_sym=args.n_symmetries_batch).cuda().float()
 
