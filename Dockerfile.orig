@@ -1,0 +1,10 @@
+FROM nvcr.io/nvidia/nvhpc:21.2-devel-cuda_multi-ubuntu20.04
+
+SHELL ["/bin/bash", "-c"]
+
+ADD Miniconda3-latest-Linux-x86_64.sh /
+RUN bash /Miniconda3-latest-Linux-x86_64.sh -b -p /opt/conda \
+ && ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh \
+ && echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc \
+ && echo "conda activate cosypose" >> ~/.bashrc \
+ && /opt/conda/bin/conda env create -n cosypose --file environment.yaml

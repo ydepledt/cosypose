@@ -3,6 +3,8 @@ import torch.multiprocessing
 import time
 import json
 import os
+import glob
+import sys
 
 from collections import OrderedDict
 import yaml
@@ -47,49 +49,26 @@ from cosypose.datasets.bop import remap_bop_targets
 from cosypose.datasets.wrappers.multiview_wrapper import MultiViewWrapper
 from cosypose.datasets.samplers import ListSampler
 
-from cosypose.scripts.prediction_script import inference, load_detector, load_pose_models, crop_for_far, inference2, inference3
+from cosypose.scripts.prediction_script import inference, load_detector, load_pose_models, crop_for_far, inference2, inference3, inference4, selectDetectorCoarseRefinerModel, filePath, camera_parametrization, renderImage, rgbgryToBool
 
-def main():
+def sequence(filename, data_path, rgb_path, object_set, camera_name, maximum = 2, renderBool = False, grayscale_bool = False,  nb_refine_it = 3):
+    
+    bbox_current_list=[]
+    bbox_previous_list=[] 
+    bbox_inter_list=[]
+    
     # path initialization
-    data_path = LOCAL_DATA_DIR / 'legrand1' 
     scene_path = data_path  / 'scene'
-    camera_name = 'realsense.json'
     
     # predictions parameters
     n_coarse_iterations = 1
-    n_refiner_iterations = 2
+    n_refiner_iterations = nb_refine_it
 
-    # model handling
-    object_set = 'tless'
-    
-    if object_set == 'tless':
-        detector_run_id = 'detector-bop-tless-synt+real--452847'
-        coarse_run_id = 'coarse-bop-tless-synt+real--160982'
-        refiner_run_id = 'refiner-bop-tless-synt+real--881314'
-    elif object_set == 'ycbv_stairs':
-        detector_run_id = 'detector-ycbv_stairs--720976'
-        coarse_run_id = 'cesar-coarse--700791'
-        coarse_run_id = 'ycbv_stairs-coarse-4GPU-fixed-368846'
-        refiner_run_id = 'cesar-refiner--173275'
-        refiner_run_id = 'ycbv_stairs-refiner-4GPU-4863'
-    elif object_set == 'ycbv':
-        detector_run_id = 'detector-bop-ycbv-synt+real--292971'
-        coarse_run_id = 'coarse-bop-ycbv-synt+real--822463'
-        refiner_run_id = 'refiner-bop-ycbv-synt+real--631598'
+    # model handling  
+    detector_run_id, coarse_run_id, refiner_run_id = selectDetectorCoarseRefinerModel(object_set)
 
     # camera parametrization
-    cam_infos = json.loads((data_path / camera_name).read_text())
-    K_ = np.array([[cam_infos['fx'], 0.0, cam_infos['cx']],
-            [0.0, cam_infos['fy'], cam_infos['cy']],
-            [0.0, 0.0, 1]])
-    K = torch.as_tensor(K_)
-    K = K.unsqueeze(0)
-    K = K.cuda().float()
-    TC0 = Transform(np.eye(3), np.zeros(3))
-    T0C = TC0.inverse()
-    T0C = T0C.toHomogeneousMatrix()
-    resolution = (cam_infos['height'], cam_infos['width'])
-    camera = dict(T0C=T0C, K=K_, TWC=T0C, resolution=resolution)
+    camera, K = camera_parametrization(data_path, camera_name)
 
     # detector and predictor loading
     detector = load_detector(detector_run_id)
@@ -109,24 +88,24 @@ def main():
     status = []
     detection_score = []
 
-    # plot utils
-    video_render = False
-    # clean the images folder
-    os.system('rm -f /local/users/gsaurel/cosy/cosypose/images/*.png')
-    if object_set == 'tless':
-        renderer = BulletSceneRenderer('tless.cad', gpu_renderer=True)
-    if object_set == 'ycbv_stairs':
-        renderer = BulletSceneRenderer('ycbv_stairs', gpu_renderer=True)
-    else:
-        renderer = BulletSceneRenderer('ycbv', gpu_renderer=True)
-    plt = plotter.Plotter()
+    # clean and create the images folder
+    dir_name = "img_yann/" + filename + '/'
+
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
+    
+    images = os.listdir(dir_name)
+
+    for image in images:
+        if image.endswith(".png") or image.endswith(".jpeg"):
+            os.remove(os.path.join(dir_name, image))
 
     delta_t_predictions = []
     delta_t_detections = []
     delta_t_renderer = []
     delta_t_network = []
 
-    for i in range (1,number_images):
+    for i in range (1,min(maximum+1, number_images)): 
         print('-'*80)
         print(i)
         print('-'*80)
@@ -140,7 +119,7 @@ def main():
         rgb = np.array(Image.open(rgb_path))
  
         if previousPose_init:
-            detections, final_preds, all_preds = inference3(
+            detections, final_preds, all_preds, bbox_current_list, bbox_previous_list, bbox_inter_list= inference4(
                     detector, predictor, rgb, K,
                     TCO_init=TCO_init.cuda(),
                     n_coarse_iterations=0,
@@ -176,7 +155,7 @@ def main():
         else:
             TCO_init = tc.PandasTensorCollection(infos=detections.infos, poses=final_preds.poses, bboxes=detections.bboxes)
             # Set to true if you want to warm start
-            previousPose_init = False
+            previousPose_init = True
             delta_t_detections.append(delta_t['detections'])
             delta_t_predictions.append(delta_t['predictions'])
             delta_t_renderer.append(delta_t['renderer'])
@@ -200,12 +179,15 @@ def main():
 
 
         # plotting
-        if i < 1000:
-            if video_render:
-                plotIm = plt.plot_image(rgb)
-                figures = sv_viewer.make_singleview_custom_plot(rgb, camera,
-                    renderer, final_preds, detections)
-                export_png(figures['pred_overlay'], filename=f'images/{image_name}')
+        if i < 9999:
+            if renderBool:
+                file = "img_yann/" + filename + '/'
+
+                # plotIm = plt.plot_image(rgb)
+                # figures = sv_viewer.make_singleview_custom_plot(rgb, camera,
+                #     renderer, final_preds, detections)
+                # export_png(figures['pred_overlay'], filename=f'images/{image_name}')
+                renderImage(rgb_path, object_set, camera, final_preds, detections, file + f'result_{image_name}', grayscale_bool, bbox_current_list, bbox_previous_list, bbox_inter_list)
 
     # saving data
     df = pd.DataFrame(
@@ -221,7 +203,8 @@ def main():
             }
         )
 
-    df.to_pickle('results.pkl', protocol=2)
+    df.to_pickle('results_' + filename + '.pkl', protocol=2)
+
 
     # time analysis
     print('Average time mask rcnn :' + str(np.mean(np.array(delta_t_detections))))
@@ -229,7 +212,35 @@ def main():
     print('Average time renderer :' + str(np.mean(np.array(delta_t_renderer))))
     print('Average time network :' + str(np.mean(np.array(delta_t_network))))
 
+    return delta_t_detections, delta_t_detections, delta_t_renderer, delta_t_network
 
+def main():
+
+    nb_of_param = len(sys.argv)
+    renderBool = False
+    nb_of_imgs = 5
+    grayscale_bool = False
+    nb_refine_it = 3
+    
+    if (nb_of_param == 1):
+        filename = "many_stairs"
+        data_path, rgb_path, object_set, camera_name = filePath("many_stairs", 1)
+    else:
+        filename = sys.argv[1]
+        data_path, rgb_path, object_set, camera_name = filePath(sys.argv[1], 1)
+        if (nb_of_param >= 3):
+            nb_of_imgs = int(sys.argv[2])
+        if (nb_of_param >= 4):
+            renderBool = eval(sys.argv[3])
+        if (nb_of_param >= 5):
+            try:
+                grayscale_bool = eval(sys.argv[4])
+            except NameError:
+                grayscale_bool = rgbgryToBool(sys.argv[4])
+        if (nb_of_param >= 6):
+            nb_refine_it = int(sys.argv[5])
+
+    sequence(filename, data_path, rgb_path, object_set, camera_name, nb_of_imgs, renderBool, grayscale_bool, nb_refine_it)
     
 if __name__ == '__main__':
     main()

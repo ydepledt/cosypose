@@ -147,13 +147,14 @@ def inference(detector, predictor, rgb, K, TCO_init=None, n_coarse_iterations=1,
     # prediction running
     timer_detection = Timer()
     timer_detection.start()
-    detections = detector.get_detections(images=rgb,
+    detections = detector.get_detections(images=rgb, 
             one_instance_per_class=False,
             detection_th = 0.95,
             output_masks = None,
             mask_th = 0.1)
-    print(detections)
+    print("\n", detections, "\n")
     delta_t_detections = timer_detection.stop()
+    
     if detections.infos.empty:
         print('-'*80)
         print('No object detected')
@@ -168,6 +169,7 @@ def inference(detector, predictor, rgb, K, TCO_init=None, n_coarse_iterations=1,
                 n_coarse_iterations=n_coarse_iterations,
                 n_refiner_iterations=n_refiner_iterations,
             )
+        
         delta_t_prediction = timer_prediction.stop()
         delta_t_render = all_preds['delta_t_render']
         delta_t_net = all_preds['delta_t_net']
@@ -176,7 +178,9 @@ def inference(detector, predictor, rgb, K, TCO_init=None, n_coarse_iterations=1,
                 'predictions':delta_t_prediction.total_seconds(),
                 'renderer':np.mean(np.array(delta_t_render)),
                 'network':np.mean(np.array(delta_t_net))}
+                
         return detections, final_preds, all_preds, delta_t
+
 
 def bbox_center(bbox):
     u = (bbox[0]+bbox[2])/2
@@ -359,10 +363,10 @@ def inference3(detector, predictor, rgb, K, TCO_init=None, n_coarse_iterations=1
 def main():
     # path initialization
     data_path = LOCAL_DATA_DIR / 'bop_datasets/ycbv_stairs'
-    data_path = LOCAL_DATA_DIR / 'many_stairs'
+    data_path = LOCAL_DATA_DIR / 'solo_stairs3'
     scene_path = data_path / 'scene' 
-    rgb_path = scene_path  / '0110.png'
-    rgb_path = LOCAL_DATA_DIR / 'many_stairs' / 'scene' / '0063.png'
+    rgb_path = scene_path  / '0002.png'
+    rgb_path = LOCAL_DATA_DIR / 'solo_stairs3' / 'scene' / '0002.png'
     
     n_refiner_iterations = 3
 
@@ -377,7 +381,7 @@ def main():
         detector_run_id = 'detector-ycbv_stairs--720976'
         coarse_run_id = 'ycbv_stairs-coarse-4GPU-fixed-434372'
         refiner_run_id = 'ycbv_stairs-refiner-4GPU-4863'
-    elif ycbv == 'ycbv':
+    elif object_set == 'ycbv':
         detector_run_id = 'detector-bop-ycbv-synt+real--292971'
         coarse_run_id = 'coarse-bop-ycbv-synt+real--822463'
         refiner_run_id = 'refiner-bop-ycbv-synt+real--631598'
@@ -402,7 +406,7 @@ def main():
     predictor, mesh_db = load_pose_models(coarse_run_id, refiner_run_id, object_set=object_set)
 
     # load image for render
-    """
+    
     rgb = Image.open(rgb_path)
     grayscale_im = np.array(ImageOps.grayscale(rgb))
     grayscale = np.zeros((720,1280,3), dtype=int)
@@ -413,7 +417,7 @@ def main():
                 grayscale[i,j,k] = grayscale_im[i,j]
     grayscale = grayscale.astype(np.uint8)
     # grayscale = np.array(rgb)
-    """
+    
     
     # plotting
     plt = plotter.Plotter()
@@ -440,12 +444,12 @@ def main():
    
     print(final_preds.poses)
     # render
-    """
+    
     plotIm = plt.plot_image(grayscale)
     figures = sv_viewer.make_singleview_custom_plot(grayscale, camera, renderer, final_preds, detections)
     export_png(figures['pred_overlay'], filename='results.png')
     grayscale_im = Image.fromarray(grayscale)
     grayscale_im.save("input.jpeg")
-    """
+    
 if __name__ == '__main__':
     main()

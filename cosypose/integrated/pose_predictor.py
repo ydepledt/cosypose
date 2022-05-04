@@ -90,7 +90,7 @@ class CoarseRefinePosePredictor(torch.nn.Module):
         preds = dict()
         delta_t_net = []
         delta_t_render = []
-        if data_TCO_init is None:
+        if data_TCO_init is None: #no coarse if TCO_init is given
             assert detections is not None
             assert self.coarse_model is not None
             assert n_coarse_iterations > 0

@@ -196,7 +196,7 @@ def train_detector(args):
         logger.info(f'Using pretrained model from {pretrain_path}.')
         model.load_state_dict(torch.load(pretrain_path)['state_dict'])
     elif args.pretrain_coco:
-        state_dict = load_state_dict_from_url(model_urls['maskrcnn_resnet50_fpn_coco'])
+        state_dict = _from_url(model_urls['maskrcnn_resnet50_fpn_coco'])
         keep = lambda k: 'box_predictor' not in k and 'mask_predictor' not in k
         state_dict = {k: v for k, v in state_dict.items() if keep(k)}
         model.load_state_dict(state_dict, strict=False)
