@@ -106,9 +106,9 @@ def sequence(filename, data_path, rgb_path, object_set, camera_name, maximum = 2
     delta_t_network = []
 
     for i in range (1,min(maximum+1, number_images)): 
-        print('-'*80)
+        print('-'*81)
         print(i)
-        print('-'*80)
+        print('-'*81)
         timer = Timer()
         timer.start()
         
