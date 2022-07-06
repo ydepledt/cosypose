@@ -278,42 +278,65 @@ def bbox_center(bbox):
 
     return u,v,large 
 
-def image_formating(rgb):
+def image_formating(image):
 
-    """Gets and returns bbox center
+    """Formates an image given and returns it
 
     Args:
-        bbox  (list[double]) : list of bbox's corners coordinate   
+        image (np.array) : image in color   
 
 
     Returns:
-        u     (double)       : xcoordinates of center
-        v     (double)       : ycoordinates of center
-        large (double)       : lenght of diagonal's half
+        image (np.array) : image formated in color
     """
-    
-    if rgb.ndim == 2:
-        rgb = np.repeat(rgb[..., None], 3, axis=-1)
-    rgb = rgb[..., :3]
-    h, w = rgb.shape[:2]
-    rgb = torch.as_tensor(rgb)
-    rgb = rgb.unsqueeze(0)
-    rgb = rgb.cuda().float().permute(0, 3, 1, 2) / 255
-    return rgb
 
-def renderImage(image_path, object_set, camera, final_preds, detections, name, grayscale_bool, bbox_current_list=[], bbox_previous_list=[], bbox_inter_list=[]):
+    if image.ndim == 2:
+        image = np.repeat(image[..., None], 3, axis=-1)
+
+    image = image[..., :3]
+    image = torch.as_tensor(image)
+    image = image.unsqueeze(0)
+    image = image.cuda().float().permute(0, 3, 1, 2) / 255
+
+    return image
+
+def renderImage(image_path, object_set, camera, final_preds, detections, rendered_img_name, grayscale_img, bbox_current_list=[], bbox_previous_list=[], bbox_inter_list=[]):
+
+    """Formates an image given and returns it
+
+    Args:
+        image_path         (string)                        : path to image   (local_data/dataset_name/image_idx.png)
+        object_set         (string)                        : type of dataset (ex : 'tless', 'ycbv')
+        camera             (matrix)                        
+        final_preds        (dict)                          : last predictions from predictor
+        detections         (PandasTensorCollection object) : detections from detector
+        rendered_img_name  (string)                        : name of the png result
+        grayscale_img      (bool)                          : result in grayscale or color
+        bbox_current_list  (list[list[double]])            : list of current box's corners coordinate for each object in the scene (ex: [[x1,y1,x2,y2], [x1_2,y1_2,x2_2,y2_2], ...])                
+        bbox_previous_list (list[list[double]])            : list of previous box's corners coordinate for each object in the scene                
+        bbox_inter_list    (list[list[double]])            : list of intersection box's corners coordinate for each object in the scene                 
+
+
+    Returns:
+        image (np.array) : image formated in color
+    """
 
     # load image for render
-    rgb = Image.open(image_path)
-    if (grayscale_bool):
-        grayscale_im = np.array(ImageOps.grayscale(rgb))
-        image = np.zeros((grayscale_im.shape[0],grayscale_im.shape[1],3), dtype=int)
+    image = Image.open(image_path)
+
+    # if user want a result in grayscale
+    if (grayscale_img):
+        grayscale_image = np.array(ImageOps.grayscale(image)) # convert image to grayscale
+        image = np.zeros((grayscale_image.shape[0],grayscale_image.shape[1],3), dtype=int)
+
         for i in range(image.shape[0]):
             for j in range(image.shape[1]):
-                image[i,j] = grayscale_im[i,j]
+                image[i,j] = grayscale_image[i,j]
+
         image = image.astype(np.uint8)
+
     else:
-        image = np.array(rgb).astype(np.uint8)
+        image = np.array(image).astype(np.uint8)
     
     # plotting
     plt = plotter.Plotter()
@@ -325,23 +348,22 @@ def renderImage(image_path, object_set, camera, final_preds, detections, name, g
         obj_ds_name = 'ycbv'
     renderer = BulletSceneRenderer(obj_ds_name, gpu_renderer=True)
 
-    # render
-    plotIm = plt.plot_image(image)
+    # render the image
     figures = sv_viewer.make_singleview_custom_plot(image, camera, renderer, final_preds, detections)
 
-    # figures['pred_overlay'] = np.array(figures['pred_overlay'])
-
+    # draw bounding_boxex detections for all detected objects in input image
     drawDetections(image, bbox_current_list, bbox_previous_list, bbox_inter_list)
 
-    export_png(figures['pred_overlay'], filename=f'{name}')
+    # create a png image with poses as overlay
+    export_png(figures['pred_overlay'], filename=f'{rendered_img_name}')
    
-
-    grayscale_im = Image.fromarray(image)
+    image = Image.fromarray(image)
     
+    # name of images result depend on the script launched
     if sys.argv[0][27:-10] == "prediction":
-        grayscale_im.save("input.jpeg")
+        image.save("input.jpeg") # only one result with prediction
     elif sys.argv[0][27:-10] == "sequence":
-        grayscale_im.save(name[:-15] + "input_" + name[-8:-4] + ".jpeg") #input_XXXX.jpeg
+        image.save(rendered_img_name[:-15] + "input_" + rendered_img_name[-8:-4] + ".jpeg") # form of images results : input_XXXX.jpeg
 
 
 def camera_parametrization(dataset_path, camera_name):
@@ -574,6 +596,7 @@ def inference4(detector, predictor, rgb, K, TCO_init=None, n_coarse_iterations=1
                 bbox_inters = []
                 ious        = []
                 k_list      = []
+
                 for k in range(len(TCO_init.infos)):
                     if (TCO_init.infos['label'][k] == label):
                         
@@ -634,7 +657,7 @@ def main():
     nb_of_param = len(sys.argv)
     renderBool = False
     n_refiner_iterations = 3
-    grayscale_bool = False
+    grayscale_img = False
     
     if (nb_of_param < 3):
         if (nb_of_param == 1):
@@ -647,9 +670,9 @@ def main():
             renderBool = eval(sys.argv[3])
         if (nb_of_param >= 5):
             try:
-                grayscale_bool = eval(sys.argv[4])
+                grayscale_img = eval(sys.argv[4])
             except NameError:
-                grayscale_bool = rgbgryToBool(sys.argv[4])
+                grayscale_img = rgbgryToBool(sys.argv[4])
         if (nb_of_param >= 6):
             n_refiner_iterations = int(sys.argv[5])
             
@@ -672,7 +695,7 @@ def main():
     print(final_preds.poses)
 
     if (renderBool):
-        renderImage(image_path, object_set, camera, final_preds, detections, "result.png", grayscale_bool)
+        renderImage(image_path, object_set, camera, final_preds, detections, "result.png", grayscale_img)
 
     
 if __name__ == '__main__':

@@ -51,7 +51,7 @@ from cosypose.datasets.samplers import ListSampler
 
 from cosypose.scripts.prediction_script import inference, load_detector, load_pose_models, inference3, inference4, selectDetectorCoarseRefinerModel, sceneInformation, camera_parametrization, renderImage, rgbgryToBool
 
-def sequence(filename, data_path, rgb_path, object_set, camera_name, maximum = 2, renderBool = False, grayscale_bool = False,  nb_refine_it = 3):
+def sequence(filename, data_path, rgb_path, object_set, camera_name, maximum = 2, renderBool = False, grayscale_img = False,  nb_refine_it = 3):
     
     bbox_current_list=[]
     bbox_previous_list=[] 
@@ -187,7 +187,7 @@ def sequence(filename, data_path, rgb_path, object_set, camera_name, maximum = 2
                 # figures = sv_viewer.make_singleview_custom_plot(rgb, camera,
                 #     renderer, final_preds, detections)
                 # export_png(figures['pred_overlay'], filename=f'images/{image_name}')
-                renderImage(rgb_path, object_set, camera, final_preds, detections, file + f'result_{image_name}', grayscale_bool, bbox_current_list, bbox_previous_list, bbox_inter_list)
+                renderImage(rgb_path, object_set, camera, final_preds, detections, file + f'result_{image_name}', grayscale_img, bbox_current_list, bbox_previous_list, bbox_inter_list)
 
     # saving data
     df = pd.DataFrame(
@@ -219,7 +219,7 @@ def main():
     nb_of_param = len(sys.argv)
     renderBool = False
     nb_of_imgs = 5
-    grayscale_bool = False
+    grayscale_img = False
     nb_refine_it = 3
     
     if (nb_of_param == 1):
@@ -234,13 +234,13 @@ def main():
             renderBool = eval(sys.argv[3])
         if (nb_of_param >= 5):
             try:
-                grayscale_bool = eval(sys.argv[4])
+                grayscale_img = eval(sys.argv[4])
             except NameError:
-                grayscale_bool = rgbgryToBool(sys.argv[4])
+                grayscale_img = rgbgryToBool(sys.argv[4])
         if (nb_of_param >= 6):
             nb_refine_it = int(sys.argv[5])
 
-    sequence(filename, data_path, rgb_path, object_set, camera_name, nb_of_imgs, renderBool, grayscale_bool, nb_refine_it)
+    sequence(filename, data_path, rgb_path, object_set, camera_name, nb_of_imgs, renderBool, grayscale_img, nb_refine_it)
     
 if __name__ == '__main__':
     main()
