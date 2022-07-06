@@ -60,39 +60,67 @@ os.environ['MESA_GLSL_VERSION_OVERRIDE'] = '420'
 
 
 def load_detector(run_id):
-    """Load the detector"""
+    """Gets and returns the detector, given an ID
 
-    run_dir = EXP_DIR / run_id  #path of model
-    cfg = yaml.load((run_dir / 'config.yaml').read_text(), Loader=yaml.FullLoader)
+    Args:
+        run_id (string) : represent the ID of the detector (ex : 'detector-bop-tless-synt+real--452847')
+
+    Returns:
+        model  (Detector object)
+    """
+
+    run_dir = EXP_DIR / run_id  # path of the model (local_data/experiments/model's ID)
+
+    cfg = yaml.load((run_dir / 'config.yaml').read_text(), Loader=yaml.FullLoader) # load config file
     cfg = check_update_config_detector(cfg)
+
     label_to_category_id = cfg.label_to_category_id
-    model = create_model_detector(cfg, len(label_to_category_id))
+
+    model = create_model_detector(cfg, len(label_to_category_id)) # create a mask for detector (DetectorMaskRCNN object)
+    
     ckpt = torch.load(run_dir / 'checkpoint.pth.tar')
     ckpt = ckpt['state_dict']
     model.load_state_dict(ckpt) #parameters and buffers loaded
     model = model.cuda().eval() #send model to current device
     model.cfg = cfg 
     model.config = cfg
-    model = Detector(model)
+
+    model = Detector(model) # create a Detector object
+
     return model
 
 def load_pose_models(coarse_run_id, refiner_run_id=None, n_workers=8, object_set='tless'):
-    """Load the predictor"""
+    """Gets and returns predictors (coarse and refiner), given an ID
 
-    run_dir = EXP_DIR / coarse_run_id
+    Args:
+        coarse_run_id  (string) : ID of the coarse  predictor (ex : 'coarse-bop-tless-synt+real--160982')
+        refiner_run_id (string) : ID of the refiner predictor (ex : 'ycbv_stairs-refiner-4GPU-4863')
+        n_workers      (int)    : number of workers for the renderer
+        object_set     (string) : type of dataset (ex : 'tless', 'ycbv')    
+        
 
-    if object_set == 'tless':
+    Returns:
+        model          (Detector object)
+        mesh_db        (MeshDataBase object)
+    """
+
+    run_dir = EXP_DIR / coarse_run_id # path of the coarse model (local_data/experiments/model's ID)
+
+    if object_set == 'tless': 
         object_ds_name, urdf_ds_name = 'tless.bop', 'tless.cad'
     elif object_set == 'ycbv_stairs':
         object_ds_name, urdf_ds_name = 'ycbv_stairs', 'ycbv_stairs'
     else:
         object_ds_name, urdf_ds_name = 'ycbv.bop-compat.eval', 'ycbv'    
 
-    object_ds = make_object_dataset(object_ds_name)
-    mesh_db = MeshDataBase.from_object_ds(object_ds)
-    renderer = BulletBatchRenderer(object_set=urdf_ds_name, n_workers=n_workers, preload_cache=False)
+    object_ds = make_object_dataset(object_ds_name) # create BOPObjectDataset object
 
+    mesh_db         = MeshDataBase.from_object_ds(object_ds) # create a mesh of the object (MeshDataBase object)
     mesh_db_batched = mesh_db.batched().cuda()
+
+    renderer = BulletBatchRenderer(object_set=urdf_ds_name, n_workers=n_workers, preload_cache=False) # create BulletBatchRenderer object for future rendering
+
+
     def load_model(run_id):
         if run_id is None:
             return
@@ -111,92 +139,159 @@ def load_pose_models(coarse_run_id, refiner_run_id=None, n_workers=8, object_set
         model.config = cfg
         return model
 
-    coarse_model = load_model(coarse_run_id)
-    refiner_model = load_model(refiner_run_id)
+
+    coarse_model  = load_model(coarse_run_id)  # coarse loaded
+    refiner_model = load_model(refiner_run_id) # refiner loaded
+
     model = CoarseRefinePosePredictor(coarse_model=coarse_model,
-        refiner_model=refiner_model) #Create a subclass of nn.Module (neural network)
+        refiner_model=refiner_model) # create a subclass of nn.Module (neural network)
+
     return model, mesh_db
 
-def filePath(object, imgNb = 1):
-    data_path = LOCAL_DATA_DIR / object
-    rgb_path = data_path / 'scene' /  (str(imgNb).zfill(4) + ".png")
-    filepath = glob.glob(str(data_path) + '/*.json')[0]
+def sceneInformation(dataset_name, image_idx = 1):
+
+    """Gets and returns all informations about the scene and the image
+
+    Args:
+        dataset_name (string) : name of the dataset (ex : soup1, powerstrip1)
+        image_idx    (int)    : index of the image in the scene     
+        
+
+    Returns:
+        dataset_path (string) : path to dataset (local_data/dataset_name)
+        image_path   (string) : path to image   (local_data/dataset_name/image_idx.png)
+        object_set   (string) : type of dataset (ex : 'tless', 'ycbv') 
+        camera_name  (string) : name of the camera + .json
+    """
+
+    dataset_path = LOCAL_DATA_DIR / dataset_name
+
+    image_path = dataset_path / 'scene' /  (str(image_idx).zfill(4) + ".png")
+
+    filepath = glob.glob(str(dataset_path) + '/*.json')[0]
     camera_name = splitext(basename(filepath))[0] + ".json"
     
-    if ((object.lower().find("stair") != -1) or (object.lower().find("ycbv_stairs") != -1)):
-        object_set = "ycbv_stairs"
-    elif ((object.lower().find("soup") != -1) or ((object.lower().find("ycbv") != -1) and (object.lower().find("ycbv_stairs") == -1))):
+    # check if dataset is based on stairs model
+    if ((dataset_name.lower().find("stair") != -1) or (dataset_name.lower().find("ycbv_stairs") != -1)):
+        object_set = "ycbv_stairs" 
+    
+    # check if dataset is based on soup can model
+    elif ((dataset_name.lower().find("soup") != -1) or ((dataset_name.lower().find("ycbv") != -1) and (dataset_name.lower().find("ycbv_stairs") == -1))):
         object_set = "ycbv"
-    elif ((object.lower().find("switch") != -1) or (object.lower().find("powerstrip") != -1) or (object.lower().find("tless") != -1)):
+
+    # check if dataset is based on switches or powerstrips model
+    elif ((dataset_name.lower().find("switch") != -1) or (dataset_name.lower().find("powerstrip") != -1) or (dataset_name.lower().find("tless") != -1)):
         object_set = "tless"
+
     else:
         object_set = "tless"
     
-    return data_path, rgb_path, object_set, camera_name
+    return dataset_path, image_path, object_set, camera_name
 
 def IOU(box1, box2):
-    x1, y1, x2, y2 = box1[0], box1[1], box1[2], box1[3]
-    x3, y3, x4, y4 = box2[0], box2[1], box2[2], box2[3] 
+
+    """Gets and returns the area of intersection of two boxes
+
+    Args:
+        box1      (list[double]) : list of box's corners coordinate
+        box2      (list[double]) : list of box's corners coordinate     
+
+        box1[0],box[1]____________________
+               |                          |                          
+               |                          |
+               |                          |
+               |                          |
+               |___________________box1[2],box[3]
+                
+
+    Returns:
+        iou       (double)       : area of boxes' intersection over area of boxes' union
+        box_inter (list[double]) : list of intersection box's corners  
+    """
+
+    x1, y1, x2, y2 = box1[0], box1[1], box1[2], box1[3] # box 1 corners
+    x3, y3, x4, y4 = box2[0], box2[1], box2[2], box2[3] # box 2 corners
+
     x_inter1 = max(x1,x3)
     y_inter1 = max(y1,y3)
     x_inter2 = min(x2,x4)
     y_inter2 = min(y2,y4)
-    box_inter = [x_inter1, y_inter1, x_inter2, y_inter2]
+
+    box_inter = [x_inter1, y_inter1, x_inter2, y_inter2] # intersection of the two boxes
     width_inter = abs(x_inter2 - x_inter1)
     height_inter = abs(y_inter2 - y_inter1)
     area_inter = width_inter * height_inter
+
     width_box1 = abs(x2-x1)
     height_box1 = abs(y2-y1)
     width_box2 = abs(x4-x3)
     height_box2 = abs(y4-y3)
+
     area_box1 = width_box1 * height_box1    
     area_box2 = width_box2 * height_box2
+
     area_union = area_box1 + area_box2 - area_inter
+
     iou = area_inter/area_union
+
     return iou, box_inter
 
 def argmax(list):
+
+    """Gets and returns max's index 
+
+    Args:
+        list  (list[])      
+
+
+    Returns:
+        index (int) : index of the max (greater than 0 and smaller than 1) 
+    """
     max = 0
     index = -1
+
     for i in range(len(list)):
         if max < list[i] and list[i] > 0 and list[i] < 1:
             max = list[i]
             index = i
+
     return index
 
-def crop_for_far(rgb, K):
-    """
-    Experiment...
-    """
-    h,w = rgb.shape[:2]
-    new_h, new_w = int(h/2), int(w/2)
-
-    new_im_1 = rgb[0:new_h, 0:new_w, :]
-    new_im_2 = rgb[new_h:, new_w:, :]
-    new_im_3 = rgb[0:new_h, new_w:, :]
-    new_im_4 = rgb[new_h:, 0:new_w, :]
-    imgs = [new_im_1, new_im_2, new_im_3, new_im_4]
-
-    K_init = torch.zeros(4,3,3)
-    for i in range(4):
-        K_init[i,:,:] = K
-
-    boxes = torch.tensor([[0, 0, new_w, new_h],
-        [new_w, new_h, w, h],
-        [new_w, 0, w, new_h],
-        [0, new_h, new_w, h]])
-                                                        
-    K = get_K_crop_resize(K_init, boxes, (h,w), (new_h,new_w))
-    return imgs, K
-
 def bbox_center(bbox):
+
+    """Gets and returns bbox center
+
+    Args:
+        bbox  (list[double]) : list of bbox's corners coordinate   
+
+
+    Returns:
+        u     (double)       : xcoordinates of center
+        v     (double)       : ycoordinates of center
+        large (double)       : lenght of diagonal's half
+    """
+
     u = (bbox[0]+bbox[2])/2
     v = (bbox[1]+bbox[3])/2
-    large = np.sqrt((bbox[2]-bbox[0])*(bbox[2]-bbox[0]) +
-            (bbox[3]-bbox[1])*(bbox[3]-bbox[1]))/2
-    return u,v,large
+
+    large = np.sqrt((bbox[2]-bbox[0])**2 +(bbox[3]-bbox[1])**2)/2
+
+    return u,v,large 
 
 def image_formating(rgb):
+
+    """Gets and returns bbox center
+
+    Args:
+        bbox  (list[double]) : list of bbox's corners coordinate   
+
+
+    Returns:
+        u     (double)       : xcoordinates of center
+        v     (double)       : ycoordinates of center
+        large (double)       : lenght of diagonal's half
+    """
+    
     if rgb.ndim == 2:
         rgb = np.repeat(rgb[..., None], 3, axis=-1)
     rgb = rgb[..., :3]
@@ -206,10 +301,10 @@ def image_formating(rgb):
     rgb = rgb.cuda().float().permute(0, 3, 1, 2) / 255
     return rgb
 
-def renderImage(rgb_path, object_set, camera, final_preds, detections, name, grayscale_bool, bbox_current_list=[], bbox_previous_list=[], bbox_inter_list=[]):
+def renderImage(image_path, object_set, camera, final_preds, detections, name, grayscale_bool, bbox_current_list=[], bbox_previous_list=[], bbox_inter_list=[]):
 
     # load image for render
-    rgb = Image.open(rgb_path)
+    rgb = Image.open(image_path)
     if (grayscale_bool):
         grayscale_im = np.array(ImageOps.grayscale(rgb))
         image = np.zeros((grayscale_im.shape[0],grayscale_im.shape[1],3), dtype=int)
@@ -249,8 +344,8 @@ def renderImage(rgb_path, object_set, camera, final_preds, detections, name, gra
         grayscale_im.save(name[:-15] + "input_" + name[-8:-4] + ".jpeg") #input_XXXX.jpeg
 
 
-def camera_parametrization(data_path, camera_name):
-    cam_infos = json.loads((data_path / camera_name).read_text())
+def camera_parametrization(dataset_path, camera_name):
+    cam_infos = json.loads((dataset_path / camera_name).read_text())
     K_ = np.array([[cam_infos['fx'], 0.0, cam_infos['cx']],
             [0.0, cam_infos['fy'], cam_infos['cy']],
             [0.0, 0.0, 1]])
@@ -543,11 +638,11 @@ def main():
     
     if (nb_of_param < 3):
         if (nb_of_param == 1):
-            data_path, rgb_path, object_set, camera_name = filePath("many_stairs", 1)
+            dataset_path, image_path, object_set, camera_name = sceneInformation("many_stairs", 1)
         if (nb_of_param == 2):
-            data_path, rgb_path, object_set, camera_name = filePath(sys.argv[1], 1)
+            dataset_path, image_path, object_set, camera_name = sceneInformation(sys.argv[1], 1)
     else:
-        data_path, rgb_path, object_set, camera_name = filePath(sys.argv[1], int(sys.argv[2]))
+        dataset_path, image_path, object_set, camera_name = sceneInformation(sys.argv[1], int(sys.argv[2]))
         if (nb_of_param >= 4):
             renderBool = eval(sys.argv[3])
         if (nb_of_param >= 5):
@@ -563,13 +658,13 @@ def main():
 
     # camera parametrization
 
-    camera, K = camera_parametrization(data_path, camera_name)
+    camera, K = camera_parametrization(dataset_path, camera_name)
 
     # detector and predictor loading
     detector = load_detector(detector_run_id)
     predictor, mesh_db = load_pose_models(coarse_run_id, refiner_run_id, object_set=object_set)
     
-    rgb = Image.open(rgb_path)
+    rgb = Image.open(image_path)
     rgb = np.array(rgb)
 
     detections, final_preds,_,_ = inference(detector, predictor, rgb, K, n_coarse_iterations=1, n_refiner_iterations=n_refiner_iterations)
@@ -577,8 +672,39 @@ def main():
     print(final_preds.poses)
 
     if (renderBool):
-        renderImage(rgb_path, object_set, camera, final_preds, detections, "result.png", grayscale_bool)
+        renderImage(image_path, object_set, camera, final_preds, detections, "result.png", grayscale_bool)
 
     
 if __name__ == '__main__':
     main()
+
+
+
+
+
+
+
+def crop_for_far(rgb, K):
+    """
+    Experiment...
+    """
+    h,w = rgb.shape[:2]
+    new_h, new_w = int(h/2), int(w/2)
+
+    new_im_1 = rgb[0:new_h, 0:new_w, :]
+    new_im_2 = rgb[new_h:, new_w:, :]
+    new_im_3 = rgb[0:new_h, new_w:, :]
+    new_im_4 = rgb[new_h:, 0:new_w, :]
+    imgs = [new_im_1, new_im_2, new_im_3, new_im_4]
+
+    K_init = torch.zeros(4,3,3)
+    for i in range(4):
+        K_init[i,:,:] = K
+
+    boxes = torch.tensor([[0, 0, new_w, new_h],
+        [new_w, new_h, w, h],
+        [new_w, 0, w, new_h],
+        [0, new_h, new_w, h]])
+                                                        
+    K = get_K_crop_resize(K_init, boxes, (h,w), (new_h,new_w))
+    return imgs, K

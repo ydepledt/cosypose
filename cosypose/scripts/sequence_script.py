@@ -49,7 +49,7 @@ from cosypose.datasets.bop import remap_bop_targets
 from cosypose.datasets.wrappers.multiview_wrapper import MultiViewWrapper
 from cosypose.datasets.samplers import ListSampler
 
-from cosypose.scripts.prediction_script import inference, load_detector, load_pose_models, crop_for_far, inference3, inference4, selectDetectorCoarseRefinerModel, filePath, camera_parametrization, renderImage, rgbgryToBool
+from cosypose.scripts.prediction_script import inference, load_detector, load_pose_models, inference3, inference4, selectDetectorCoarseRefinerModel, sceneInformation, camera_parametrization, renderImage, rgbgryToBool
 
 def sequence(filename, data_path, rgb_path, object_set, camera_name, maximum = 2, renderBool = False, grayscale_bool = False,  nb_refine_it = 3):
     
@@ -224,10 +224,10 @@ def main():
     
     if (nb_of_param == 1):
         filename = "many_stairs"
-        data_path, rgb_path, object_set, camera_name = filePath("many_stairs", 1)
+        data_path, rgb_path, object_set, camera_name = sceneInformation("many_stairs", 1)
     else:
         filename = sys.argv[1]
-        data_path, rgb_path, object_set, camera_name = filePath(sys.argv[1], 1)
+        data_path, rgb_path, object_set, camera_name = sceneInformation(sys.argv[1], 1)
         if (nb_of_param >= 3):
             nb_of_imgs = int(sys.argv[2])
         if (nb_of_param >= 4):
