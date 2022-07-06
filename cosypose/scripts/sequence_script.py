@@ -49,7 +49,7 @@ from cosypose.datasets.bop import remap_bop_targets
 from cosypose.datasets.wrappers.multiview_wrapper import MultiViewWrapper
 from cosypose.datasets.samplers import ListSampler
 
-from cosypose.scripts.prediction_script import inference, load_detector, load_pose_models, crop_for_far, inference2, inference3, inference4, selectDetectorCoarseRefinerModel, filePath, camera_parametrization, renderImage, rgbgryToBool
+from cosypose.scripts.prediction_script import inference, load_detector, load_pose_models, crop_for_far, inference3, inference4, selectDetectorCoarseRefinerModel, filePath, camera_parametrization, renderImage, rgbgryToBool
 
 def sequence(filename, data_path, rgb_path, object_set, camera_name, maximum = 2, renderBool = False, grayscale_bool = False,  nb_refine_it = 3):
     
