@@ -302,7 +302,7 @@ def image_formating(image):
 
 def renderImage(image_path, object_set, camera, final_preds, detections, rendered_img_name, grayscale_img, bbox_current_list=[], bbox_previous_list=[], bbox_inter_list=[]):
 
-    """Formates an image given and returns it
+    """Create both input and result png image
 
     Args:
         image_path         (string)                        : path to image   (local_data/dataset_name/image_idx.png)
@@ -316,9 +316,6 @@ def renderImage(image_path, object_set, camera, final_preds, detections, rendere
         bbox_previous_list (list[list[double]])            : list of previous box's corners coordinate for each object in the scene                
         bbox_inter_list    (list[list[double]])            : list of intersection box's corners coordinate for each object in the scene                 
 
-
-    Returns:
-        image (np.array) : image formated in color
     """
 
     # load image for render
@@ -367,25 +364,56 @@ def renderImage(image_path, object_set, camera, final_preds, detections, rendere
 
 
 def camera_parametrization(dataset_path, camera_name):
+
+    """Gets path to camera and returns dict with camera transformation
+
+    Args:
+        dataset_path (string)       : path to dataset (local_data/dataset_name)
+        camera_name  (string)       : name of the camera + .json
+
+    Returns:
+        camera_info  (dict)         : transformations and height/width of the camera
+        K            (torch.tensor) : intrinsics matrix
+
+    """
+
+    # load a dict based on camera.json file with all cam caracteristics
     cam_infos = json.loads((dataset_path / camera_name).read_text())
+
     K_ = np.array([[cam_infos['fx'], 0.0, cam_infos['cx']],
             [0.0, cam_infos['fy'], cam_infos['cy']],
             [0.0, 0.0, 1]])
     K = torch.as_tensor(K_)
     K = K.unsqueeze(0)
     K = K.cuda().float()
+
     TC0 = Transform(np.eye(3), np.zeros(3))
     T0C = TC0.inverse()
     T0C = T0C.toHomogeneousMatrix()
+
     h = cam_infos['height']
     w = cam_infos['width']
-    return dict(T0C=T0C, K=K_, TWC=T0C, resolution=(h,w)), K
+
+    camera_info = dict(T0C=T0C, K=K_, TWC=T0C, resolution=(h,w))
+
+    return camera_info, K
 
 
 def rgbgryToBool(color):
-    if "RGB" == color or "COLOR" == color or 'C' == color:
+
+    """Gets a color and returns a bool 
+
+    Args:
+        color (string) : color user wants
+
+    Returns:
+              (bool)   : Grayscale->True, Colored->False
+
+    """
+
+    if "RGB" == color.upper() or "COLOR" == color.upper() or 'C' == color.upper() or 'COL' == color.upper():
         return False
-    elif "GREY" == color or "GRY" == color or 'G' == color:
+    elif 'GRAYSCALE' == color.upper() or "GREY" == color.upper() or "GRY" == color.upper() or 'G' == color.upper():
         return True
     else:
         print("Error in color selection, putting grayscale as default...")
