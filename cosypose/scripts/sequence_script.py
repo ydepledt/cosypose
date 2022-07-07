@@ -130,17 +130,6 @@ def sequence(filename, data_path, rgb_path, object_set, camera_name, maximum = 2
                     n_coarse_iterations=n_coarse_iterations,
                     n_refiner_iterations=n_refiner_iterations)
 
-        # start with a good pose
-        #if (i==1):
-        #    pose_init = np.array([[ 0.9819119,  -0.18231227,  0.05110338,  0.00251109],
-        #          [-0.04824508, -0.5019084,  -0.8635743,  -0.03091885],
-        #          [ 0.1830891,   0.84548813, -0.5016254,   0.32253355],
-        #          [ 0.,         0.,          0.,          1.        ]])
-        #    pose_init = torch.tensor([pose_init]).float()
-        #    tco_init = tc.PandasTensorCollection(infos=detections.infos, poses=pose_init)
-        #    detections, final_preds,_ = inference(detector, predictor, rgb, K,
-        #                TCO_init=tco_init.cuda(), n_coarse_iterations=0)
-
         if detections.infos.empty:
             previousPose_init = False
             frame_id.append(i)

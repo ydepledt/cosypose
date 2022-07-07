@@ -421,64 +421,107 @@ def rgbgryToBool(color):
 
 
 def selectDetectorCoarseRefinerModel(object_set):
-    if object_set == 'tless':
+
+    """Depending on object returns if of detector/coarse/refiner 
+
+    Args:
+        object_set      (string) : type of dataset (ex : 'tless', 'ycbv')
+
+    Returns:
+        detector_run_id (string) : ID of the detector
+        coarse_run_id   (string) : ID of the coarse  predictor
+        refiner_run_id  (string) : ID of the refiner predictor 
+
+    """
+
+    if object_set == 'tless':         # switches and powerstrips
         detector_run_id = 'detector-bop-tless-synt+real--452847'
         coarse_run_id = 'coarse-bop-tless-synt+real--160982'
         refiner_run_id = 'refiner-bop-tless-synt+real--881314'
-    elif object_set == 'ycbv_stairs':
+
+    elif object_set == 'ycbv_stairs': # stairs
         detector_run_id = 'detector-ycbv_stairs--720976'
         coarse_run_id = 'ycbv_stairs-coarse-4GPU-fixed-434372'
         refiner_run_id = 'ycbv_stairs-refiner-4GPU-4863'
-    elif object_set == 'ycbv':
+
+    elif object_set == 'ycbv':        # soup's can
         detector_run_id = 'detector-bop-ycbv-synt+real--292971'
         coarse_run_id = 'coarse-bop-ycbv-synt+real--822463'
         refiner_run_id = 'refiner-bop-ycbv-synt+real--631598'
+
     return detector_run_id, coarse_run_id, refiner_run_id
 
 def drawDetections(image, bbox_current_list, bbox_previous_list, bbox_inter_list):
+
+    """Draw current and previous detections and their intersection on an image
+
+    Args:
+        image              (matrix)
+        bbox_current_list  (list[list[double]])            : list of current box's corners coordinate for each object in the scene (ex: [[x1,y1,x2,y2], [x1_2,y1_2,x2_2,y2_2], ...])                
+        bbox_previous_list (list[list[double]])            : list of previous box's corners coordinate for each object in the scene                
+        bbox_inter_list    (list[list[double]])            : list of intersection box's corners coordinate for each object in the scene    
+
+    Returns:        
+    """
+
     for bbox_current in bbox_current_list:
         image = cv2.rectangle(image, (bbox_current[0],bbox_current[1]), (bbox_current[2],bbox_current[3]), (255,0,0), 2)
+
     for bbox_previous in bbox_previous_list:
         image = cv2.rectangle(image, (bbox_previous[0],bbox_previous[1]), (bbox_previous[2],bbox_previous[3]), (0,255,0), 2)
+
     for bbox_inter in bbox_inter_list:
         image = cv2.rectangle(image, (bbox_inter[0],bbox_inter[1]), (bbox_inter[2],bbox_inter[3]), (0,0,255), 1)
         right_top_corner = (int(bbox_inter[2]) + 10, int(bbox_inter[1]) + 10)
-        print(right_top_corner)
+        # put the score on the image
         image = cv2.putText(image, "Iou = " + str(round(bbox_inter[4], 4)), right_top_corner, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,255), 1, cv2.LINE_AA)
 
 
 
-def inference(detector, predictor, rgb, K, TCO_init=None, n_coarse_iterations=1, n_refiner_iterations=2):
-    """
-    A dumy function that initialises with TCO_init, may crash if the detections doesn't match the init
-    """
+def inference(detector, predictor, image, K, TCO_init=None, n_coarse_iterations=1, n_refiner_iterations=2):
+    """Run all cosypose process to get detections and poses predictions. 
 
-    # C_p = TCO * O_p  transformation entre repère caméra et objet
+    Args:
+        detector             (DetectionRunner     object) 
+        predictor            (BopPredictionRunner object)               
+        image                (matrix)           
+        K                    (torch.tensor)               : intrinsics matrix
+        TCO_init                                          : pose to initialize the predictor
+        n_coarse_iterations  (int)                        : number of coarse  predictor iterations
+        n_refiner_iterations (int)                        : number of refiner predictor iterations
+
+    Returns:        
+    """
 
     # image formatting
-    rgb = image_formating(rgb)
+    image = image_formating(image)
     
     # prediction running
     timer_detection = Timer()
     timer_detection.start()
-    detections = detector.get_detections(images=rgb, 
+
+    detections = detector.get_detections(images=image, 
             one_instance_per_class=False,
             detection_th = 0.95,
             output_masks = None,
             mask_th = 0.1)
+            
     print("\n", detections, "\n")
+
     delta_t_detections = timer_detection.stop()
     
+    # no object detected in the image
     if detections.infos.empty:
         print('-'*80)
         print('No object detected')
         print('-'*80)
         return detections, None, None, None
+
     else:
         timer_prediction = Timer()
         timer_prediction.start()
         final_preds, all_preds = predictor.get_predictions(
-                rgb, K, detections=detections,
+                image, K, detections=detections,
                 data_TCO_init = TCO_init,
                 n_coarse_iterations=n_coarse_iterations,
                 n_refiner_iterations=n_refiner_iterations,
@@ -488,39 +531,53 @@ def inference(detector, predictor, rgb, K, TCO_init=None, n_coarse_iterations=1,
         delta_t_render = all_preds['delta_t_render']
         delta_t_net = all_preds['delta_t_net']
         
-        delta_t = {'detections':delta_t_detections.total_seconds(),
-                'predictions':delta_t_prediction.total_seconds(),
-                'renderer':np.mean(np.array(delta_t_render)),
-                'network':np.mean(np.array(delta_t_net))}
+        # dict with all steps execution's time
+        delta_t = {'detections' :delta_t_detections.total_seconds(),
+                   'predictions':delta_t_prediction.total_seconds(),
+                   'renderer'   :np.mean(np.array(delta_t_render)),
+                   'network'    :np.mean(np.array(delta_t_net))}
                 
         return detections, final_preds, all_preds, delta_t
 
 
-def inference3(detector, predictor, rgb, K, TCO_init=None, n_coarse_iterations=1, n_refiner_iterations=2):
-    """
-    This one is initializing each object that is detected and available in poses_init
+def inference3(detector, predictor, image, K, TCO_init=None, n_coarse_iterations=1, n_refiner_iterations=2):
 
-    BUT: - do a forward pass per object: very time inefficient for scenes with several objects
-    - assume that there is one object per class
+    """Run all cosypose process to get detections and poses predictions.
+       This function only works with sequence because it needs previous pose of the object 
+       to initialize the current pose (if it respects a threshold : distance within image)
+
+    Args:
+        detector             (DetectionRunner     object) 
+        predictor            (BopPredictionRunner object)               
+        image                (matrix)           
+        K                    (torch.tensor)               : intrinsics matrix
+        TCO_init                                          : pose to initialize the predictor
+        n_coarse_iterations  (int)                        : number of coarse  predictor iterations
+        n_refiner_iterations (int)                        : number of refiner predictor iterations
+
+    Returns:        
     """
     
     # image formatting
-    rgb = image_formating(rgb)
+    image = image_formating(image)
 
     # prediction running
-    detections = detector.get_detections(images=rgb,
+    detections = detector.get_detections(images=image,
             one_instance_per_class=False,
             detection_th = 0.98,
             output_masks = None,
             mask_th = 0.5)
+
     if detections.infos.empty:
         print('-'*80)
         print('No object detected')
         print('-'*80)
         return detections, None, None
+
     else:
         TCO_init_object = None
         counter = 0
+
         # We go through each detection to initialize if necessary
         for detection in detections:
             label = detection.infos[1]
@@ -528,10 +585,11 @@ def inference3(detector, predictor, rgb, K, TCO_init=None, n_coarse_iterations=1
             detection = tc.PandasTensorCollection(
                     infos=pd.DataFrame(infos),
                     bboxes=detection.bboxes.unsqueeze(0))
+
             bb_infos = bbox_center(detection.bboxes.cpu().numpy()[0])
+
             if not (TCO_init is None):
                 # We check if the object is in the init df
-                #TCO_infos = TCO_init.infos.loc[TCO_init['label'] == detection.infos['label'][0]]
                 TCO_init_object = None
     
                 for k in range(len(TCO_init.infos)):
@@ -539,24 +597,27 @@ def inference3(detector, predictor, rgb, K, TCO_init=None, n_coarse_iterations=1
                         bbox_det = bbox_center(TCO_init[k].bboxes.cpu().numpy())
                         dist_bb = np.linalg.norm(np.array([bbox_det[0], bbox_det[1]]) - np.array([bb_infos[0], bb_infos[1]])) #np.linalg.norm(np.array([bbox_det[0], bbox_det[1]]) - np.array([bb_infos[0], bb_infos[1]]))
                         print('bbox distance : ' + str(dist_bb))
-
+                        
+                        # threshold
                         if (dist_bb < bb_infos[2]):
                             TCO_pose = TCO_init.poses[k]
                             TCO_init_object = tc.PandasTensorCollection(
                                 infos=detection.infos.iloc[[0]],
                                 poses=TCO_pose.unsqueeze(0))
-                    
 
+            # if no initialisation, need a coarse prediction step     
             if TCO_init_object is None:
                 final_preds_object, all_preds = predictor.get_predictions(
-                        rgb, K, detections=detection,
+                        image, K, detections=detection,
                         data_TCO_init = TCO_init_object,
                         n_coarse_iterations=1,
                         n_refiner_iterations=n_refiner_iterations,
                     )
+
+            # if initialisation, no need a coarse prediction step
             else:
                 final_preds_object, all_preds = predictor.get_predictions(
-                        rgb, K, detections=detection,
+                        image, K, detections=detection,
                         data_TCO_init = TCO_init_object,
                         n_coarse_iterations=0,
                         n_refiner_iterations=n_refiner_iterations,
@@ -571,38 +632,56 @@ def inference3(detector, predictor, rgb, K, TCO_init=None, n_coarse_iterations=1
                 final_preds_info = pd.concat([final_preds_info, final_preds_object.infos], ignore_index = True)
                 final_preds.infos = final_preds_info
             counter += 1
+
         print(final_preds.poses)
+        
         return detections, final_preds, all_preds
 
-def inference4(detector, predictor, rgb, K, TCO_init=None, n_coarse_iterations=1, n_refiner_iterations=2):
-    """
-    This one is initializing each object that is detected and available in poses_init
+def inference4(detector, predictor, image, K, TCO_init=None, n_coarse_iterations=1, n_refiner_iterations=2):
 
-    BUT: - do a forward pass per object: very time inefficient for scenes with several objects
+    """Run all cosypose process to get detections and poses predictions.
+       This function only works with sequence because it needs previous pose of the object 
+       to initialize the current pose (if it respects a threshold : difference of area covered by previous/current detection)
+       https://pyimagesearch.com/2016/11/07/intersection-over-union-iou-for-object-detection/
+
+    Args:
+        detector             (DetectionRunner     object) 
+        predictor            (BopPredictionRunner object)               
+        image                (matrix)           
+        K                    (torch.tensor)               : intrinsics matrix
+        TCO_init                                          : pose to initialize the predictor
+        n_coarse_iterations  (int)                        : number of coarse  predictor iterations
+        n_refiner_iterations (int)                        : number of refiner predictor iterations
+
+    Returns:        
     """
 
+    # variable to deel with intersection over union
     bbox_inter_list    = []
     bbox_current_list  = []
     bbox_previous_list = []
     iou = 0
     
     # image formatting
-    rgb = image_formating(rgb)
+    image = image_formating(image)
 
     # prediction running
-    detections = detector.get_detections(images=rgb,
+    detections = detector.get_detections(images=image,
             one_instance_per_class=False,
             detection_th = 0.98,
             output_masks = None,
             mask_th = 0.5)
+
     if detections.infos.empty:
         print('-'*80)
         print('No object detected')
         print('-'*80)
         return detections, None, None
+
     else:
         TCO_init_object = None
         counter = 0
+
         # We go through each detection to initialize if necessary
         for detection in detections:
             label = detection.infos[1]
@@ -619,7 +698,6 @@ def inference4(detector, predictor, rgb, K, TCO_init=None, n_coarse_iterations=1
                 #TCO_infos = TCO_init.infos.loc[TCO_init['label'] == detection.infos['label'][0]]
                 TCO_init_object = None
                 
-                print(len(TCO_init.infos['label']))
                 bbox_dets   = []
                 bbox_inters = []
                 ious        = []
@@ -645,24 +723,27 @@ def inference4(detector, predictor, rgb, K, TCO_init=None, n_coarse_iterations=1
                 if index != -1:
                     bbox_previous_list.append(bbox_dets[index]) 
                     bbox_inter_list.append(bbox_inters[index])
-
+                    
+                    # currect detection's area covers 80% of previous detection's area
                     if (ious[index] > 0.80):
                         TCO_pose = TCO_init.poses[k_list[index]]
                         TCO_init_object = tc.PandasTensorCollection(
                             infos=detection.infos.iloc[[0]],
                             poses=TCO_pose.unsqueeze(0))
                     
-
+            # if no initialisation, need a coarse prediction step     
             if TCO_init_object is None:
                 final_preds_object, all_preds = predictor.get_predictions(
-                        rgb, K, detections=detection,
+                        image, K, detections=detection,
                         data_TCO_init = TCO_init_object,
                         n_coarse_iterations=1,
                         n_refiner_iterations=n_refiner_iterations,
                     )
+
+            # if initialisation, no need a coarse prediction step     
             else:
                 final_preds_object, all_preds = predictor.get_predictions(
-                        rgb, K, detections=detection,
+                        image, K, detections=detection,
                         data_TCO_init = TCO_init_object,
                         n_coarse_iterations=0,
                         n_refiner_iterations=n_refiner_iterations,
@@ -676,49 +757,55 @@ def inference4(detector, predictor, rgb, K, TCO_init=None, n_coarse_iterations=1
                 final_preds.poses = torch.cat((final_preds.poses, final_preds_object.poses))
                 final_preds_info = pd.concat([final_preds_info, final_preds_object.infos], ignore_index = True)
                 final_preds.infos = final_preds_info
+
             counter += 1
+
         print(final_preds.poses)
+
         return detections, final_preds, all_preds, bbox_current_list, bbox_previous_list, bbox_inter_list
 
 def main():
     # path initialization
     nb_of_param = len(sys.argv)
+
     renderBool = False
     n_refiner_iterations = 3
     grayscale_img = False
     
     if (nb_of_param < 3):
-        if (nb_of_param == 1):
+        if (nb_of_param == 1): # no parameters given
             dataset_path, image_path, object_set, camera_name = sceneInformation("many_stairs", 1)
-        if (nb_of_param == 2):
+        if (nb_of_param == 2): # dataset given
             dataset_path, image_path, object_set, camera_name = sceneInformation(sys.argv[1], 1)
-    else:
+
+    else:                      # dataset and index image given                   
         dataset_path, image_path, object_set, camera_name = sceneInformation(sys.argv[1], int(sys.argv[2]))
-        if (nb_of_param >= 4):
+
+        if (nb_of_param >= 4): # dataset, index image and rendering boolean given 
             renderBool = eval(sys.argv[3])
-        if (nb_of_param >= 5):
+        if (nb_of_param >= 5): # dataset, index image, rendering boolean and grayscale boolean given 
             try:
-                grayscale_img = eval(sys.argv[4])
+                grayscale_img = eval(sys.argv[4]) # if boolean is given
             except NameError:
-                grayscale_img = rgbgryToBool(sys.argv[4])
-        if (nb_of_param >= 6):
+                grayscale_img = rgbgryToBool(sys.argv[4]) # if string color is given
+
+        if (nb_of_param >= 6): # dataset, index image, rendering boolean, grayscale boolean and number of refiner iterations given 
             n_refiner_iterations = int(sys.argv[5])
             
     # model handling
     detector_run_id, coarse_run_id, refiner_run_id = selectDetectorCoarseRefinerModel(object_set)
 
     # camera parametrization
-
     camera, K = camera_parametrization(dataset_path, camera_name)
 
     # detector and predictor loading
     detector = load_detector(detector_run_id)
     predictor, mesh_db = load_pose_models(coarse_run_id, refiner_run_id, object_set=object_set)
     
-    rgb = Image.open(image_path)
-    rgb = np.array(rgb)
+    image = Image.open(image_path)
+    image = np.array(image)
 
-    detections, final_preds,_,_ = inference(detector, predictor, rgb, K, n_coarse_iterations=1, n_refiner_iterations=n_refiner_iterations)
+    detections, final_preds,_,_ = inference(detector, predictor, image, K, n_coarse_iterations=1, n_refiner_iterations=n_refiner_iterations)
    
     print(final_preds.poses)
 
@@ -735,17 +822,17 @@ if __name__ == '__main__':
 
 
 
-def crop_for_far(rgb, K):
+def crop_for_far(image, K):
     """
     Experiment...
     """
-    h,w = rgb.shape[:2]
+    h,w = image.shape[:2]
     new_h, new_w = int(h/2), int(w/2)
 
-    new_im_1 = rgb[0:new_h, 0:new_w, :]
-    new_im_2 = rgb[new_h:, new_w:, :]
-    new_im_3 = rgb[0:new_h, new_w:, :]
-    new_im_4 = rgb[new_h:, 0:new_w, :]
+    new_im_1 = image[0:new_h, 0:new_w, :]
+    new_im_2 = image[new_h:, new_w:, :]
+    new_im_3 = image[0:new_h, new_w:, :]
+    new_im_4 = image[new_h:, 0:new_w, :]
     imgs = [new_im_1, new_im_2, new_im_3, new_im_4]
 
     K_init = torch.zeros(4,3,3)
