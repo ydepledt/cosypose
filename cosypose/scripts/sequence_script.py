@@ -49,10 +49,12 @@ from cosypose.datasets.bop import remap_bop_targets
 from cosypose.datasets.wrappers.multiview_wrapper import MultiViewWrapper
 from cosypose.datasets.samplers import ListSampler
 
-from cosypose.scripts.prediction_script import inference, load_detector, load_pose_models, inference3, inference4, selectDetectorCoarseRefinerModel, sceneInformation, camera_parametrization, renderImage, rgbgryToBool
+from cosypose.scripts.prediction_script import inference, load_detector, load_pose_models, infererence_with_warmstart, infererence_with_iou_warmstart, selectDetectorCoarseRefinerModel, sceneInformation, camera_parametrization, renderImage, rgbgryToBool
 
 def sequence(filename, data_path, rgb_path, object_set, camera_name, maximum = 2, renderBool = False, grayscale_img = False,  nb_refine_it = 3):
     
+
+    # variable to deel with intersection over union
     bbox_current_list=[]
     bbox_previous_list=[] 
     bbox_inter_list=[]
@@ -99,7 +101,7 @@ def sequence(filename, data_path, rgb_path, object_set, camera_name, maximum = 2
     for image in images:
         if image.endswith(".png") or image.endswith(".jpeg"):
             os.remove(os.path.join(dir_name, image))
-
+    
     delta_t_predictions = []
     delta_t_detections = []
     delta_t_renderer = []
@@ -112,18 +114,21 @@ def sequence(filename, data_path, rgb_path, object_set, camera_name, maximum = 2
         timer = Timer()
         timer.start()
         
-        image_name = f'{str(i).zfill(4)}.png'
+        image_name = f'{str(i).zfill(4)}.png' # image_name = XXXX.png
         rgb_path = scene_path / image_name
 
         # image formatting
         rgb = np.array(Image.open(rgb_path))
- 
+
+        # if use of initialisation (previous pose), use infererence_with_iou_warmstart (can be changed with infererence_with_warmstart) function
         if previousPose_init:
-            detections, final_preds, all_preds, bbox_current_list, bbox_previous_list, bbox_inter_list= inference4(
+            detections, final_preds, all_preds, bbox_current_list, bbox_previous_list, bbox_inter_list= infererence_with_iou_warmstart(
                     detector, predictor, rgb, K,
                     TCO_init=TCO_init.cuda(),
                     n_coarse_iterations=0,
                     n_refiner_iterations=n_refiner_iterations)
+
+        # if no use of initialisation (previous pose), use inference function
         else:
             detections, final_preds, all_preds, delta_t = inference(
                     detector, predictor, rgb, K,
@@ -150,10 +155,6 @@ def sequence(filename, data_path, rgb_path, object_set, camera_name, maximum = 2
             delta_t_renderer.append(delta_t['renderer'])
             delta_t_network.append(delta_t['network'])
             print(delta_t)
-
-        #if len(detections.infos) != 1:
-        #    previousPose_init = False
-
         
         # Saving all the predictions in the lists
         for idx, final_pose in enumerate(final_preds.poses.cpu()):
@@ -171,12 +172,11 @@ def sequence(filename, data_path, rgb_path, object_set, camera_name, maximum = 2
         if i < 9999:
             if renderBool:
                 file = "img_yann/" + filename + '/'
-
-                # plotIm = plt.plot_image(rgb)
-                # figures = sv_viewer.make_singleview_custom_plot(rgb, camera,
-                #     renderer, final_preds, detections)
-                # export_png(figures['pred_overlay'], filename=f'images/{image_name}')
-                renderImage(rgb_path, object_set, camera, final_preds, detections, file + f'result_{image_name}', grayscale_img, bbox_current_list, bbox_previous_list, bbox_inter_list)
+                renderImage(rgb_path, object_set, 
+                            camera, final_preds, detections, 
+                            file + f'result_{image_name}', # result_XXXX.png 
+                            grayscale_img, bbox_current_list, 
+                            bbox_previous_list, bbox_inter_list)
 
     # saving data
     df = pd.DataFrame(
@@ -211,22 +211,27 @@ def main():
     grayscale_img = False
     nb_refine_it = 3
     
-    if (nb_of_param == 1):
+    if (nb_of_param == 1):     # no parameters given
         filename = "many_stairs"
-        data_path, rgb_path, object_set, camera_name = sceneInformation("many_stairs", 1)
-    else:
-        filename = sys.argv[1]
-        data_path, rgb_path, object_set, camera_name = sceneInformation(sys.argv[1], 1)
-        if (nb_of_param >= 3):
+        data_path, rgb_path, object_set, camera_name = sceneInformation(filename, 1)
+
+    else:                      # dataset given
+        filename = sys.argv[1] 
+        data_path, rgb_path, object_set, camera_name = sceneInformation(filename, 1)
+
+        if (nb_of_param >= 3): # dataset and number of image given  
             nb_of_imgs = int(sys.argv[2])
-        if (nb_of_param >= 4):
+
+        if (nb_of_param >= 4): # dataset, index image and rendering boolean given 
             renderBool = eval(sys.argv[3])
-        if (nb_of_param >= 5):
+
+        if (nb_of_param >= 5): # dataset, index image, rendering boolean and grayscale boolean given 
             try:
-                grayscale_img = eval(sys.argv[4])
+                grayscale_img = eval(sys.argv[4]) # if boolean is given
             except NameError:
-                grayscale_img = rgbgryToBool(sys.argv[4])
-        if (nb_of_param >= 6):
+                grayscale_img = rgbgryToBool(sys.argv[4]) # if string color is given
+
+        if (nb_of_param >= 6): # dataset, index image, rendering boolean, grayscale boolean and number of refiner iterations given 
             nb_refine_it = int(sys.argv[5])
 
     sequence(filename, data_path, rgb_path, object_set, camera_name, nb_of_imgs, renderBool, grayscale_img, nb_refine_it)

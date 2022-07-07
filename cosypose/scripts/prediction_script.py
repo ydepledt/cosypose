@@ -480,6 +480,7 @@ def drawDetections(image, bbox_current_list, bbox_previous_list, bbox_inter_list
 
 def inference(detector, predictor, image, K, TCO_init=None, n_coarse_iterations=1, n_refiner_iterations=2):
     """Run all cosypose process to get detections and poses predictions. 
+       No initialisation for the predictor
 
     Args:
         detector             (DetectionRunner     object) 
@@ -490,7 +491,10 @@ def inference(detector, predictor, image, K, TCO_init=None, n_coarse_iterations=
         n_coarse_iterations  (int)                        : number of coarse  predictor iterations
         n_refiner_iterations (int)                        : number of refiner predictor iterations
 
-    Returns:        
+    Returns:
+        detections           (PandasTensorCollection object) : detections from detector
+        final_preds          (dict)                          : last predictions from predictor
+        all_preds            (list(dict))                    : all predictions from predictor        
     """
 
     # image formatting
@@ -540,7 +544,7 @@ def inference(detector, predictor, image, K, TCO_init=None, n_coarse_iterations=
         return detections, final_preds, all_preds, delta_t
 
 
-def inference3(detector, predictor, image, K, TCO_init=None, n_coarse_iterations=1, n_refiner_iterations=2):
+def infererence_with_warmstart(detector, predictor, image, K, TCO_init=None, n_coarse_iterations=1, n_refiner_iterations=2):
 
     """Run all cosypose process to get detections and poses predictions.
        This function only works with sequence because it needs previous pose of the object 
@@ -555,7 +559,13 @@ def inference3(detector, predictor, image, K, TCO_init=None, n_coarse_iterations
         n_coarse_iterations  (int)                        : number of coarse  predictor iterations
         n_refiner_iterations (int)                        : number of refiner predictor iterations
 
-    Returns:        
+    Returns:
+        detections           (PandasTensorCollection object) : detections from detector
+        final_preds          (dict)                          : last predictions from predictor
+        all_preds            (list(dict))                    : all predictions from predictor
+        bbox_current_list    (list[list[double]])            : list of current box's corners coordinate for each object in the scene (ex: [[x1,y1,x2,y2], [x1_2,y1_2,x2_2,y2_2], ...])                
+        bbox_previous_list   (list[list[double]])            : list of previous box's corners coordinate for each object in the scene                
+        bbox_inter_list      (list[list[double]])            : list of intersection box's corners coordinate for each object in the scene        
     """
     
     # image formatting
@@ -637,7 +647,7 @@ def inference3(detector, predictor, image, K, TCO_init=None, n_coarse_iterations
         
         return detections, final_preds, all_preds
 
-def inference4(detector, predictor, image, K, TCO_init=None, n_coarse_iterations=1, n_refiner_iterations=2):
+def infererence_with_iou_warmstart(detector, predictor, image, K, TCO_init=None, n_coarse_iterations=1, n_refiner_iterations=2):
 
     """Run all cosypose process to get detections and poses predictions.
        This function only works with sequence because it needs previous pose of the object 
@@ -648,12 +658,18 @@ def inference4(detector, predictor, image, K, TCO_init=None, n_coarse_iterations
         detector             (DetectionRunner     object) 
         predictor            (BopPredictionRunner object)               
         image                (matrix)           
-        K                    (torch.tensor)               : intrinsics matrix
-        TCO_init                                          : pose to initialize the predictor
-        n_coarse_iterations  (int)                        : number of coarse  predictor iterations
-        n_refiner_iterations (int)                        : number of refiner predictor iterations
+        K                    (torch.tensor)                  : intrinsics matrix
+        TCO_init                                             : pose to initialize the predictor
+        n_coarse_iterations  (int)                           : number of coarse  predictor iterations
+        n_refiner_iterations (int)                           : number of refiner predictor iterations
 
-    Returns:        
+    Returns:
+        detections           (PandasTensorCollection object) : detections from detector
+        final_preds          (dict)                          : last predictions from predictor
+        all_preds            (list(dict))                    : all predictions from predictor
+        bbox_current_list    (list[list[double]])            : list of current box's corners coordinate for each object in the scene (ex: [[x1,y1,x2,y2], [x1_2,y1_2,x2_2,y2_2], ...])                
+        bbox_previous_list   (list[list[double]])            : list of previous box's corners coordinate for each object in the scene                
+        bbox_inter_list      (list[list[double]])            : list of intersection box's corners coordinate for each object in the scene      
     """
 
     # variable to deel with intersection over union
